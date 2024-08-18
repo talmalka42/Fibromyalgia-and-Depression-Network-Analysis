@@ -4,4 +4,5 @@ Tal Malka, Hadar Marom-Harel, Lee Frumer, Nancy Agmon-Levin, Renen Taub, Ittai G
 Roee Admon, Shir Hanuka, Naama Peretz-Tamari, Adam Brown, & Danny Horesh
 
 Contact: Tal Malka
+Department of Psychology, The New School, New York
 talmalka42@gmail.com
