@@ -104,6 +104,7 @@ set.seed(100) #note solutions will look different with different seed
 igraph_network<-as.igraph(network_fibro_plot,attributes=TRUE)
 network_fibro_spinglass<-spinglass.community(igraph_network)
 network_fibro_spinglass$membership #detecting communities 
+
 #Plot communities by color 
 
 cluster_function<-function(n){
