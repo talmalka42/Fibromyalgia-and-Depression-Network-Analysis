@@ -85,6 +85,7 @@ centralityPlot(network_fibro_plot,weighted=T,include=c("Strength","Betweenness",
 rownames(centrality_parameters$node.centrality["Strength"])[order(centrality_parameters$node.centrality[,"Strength"],decreasing=TRUE)] #sort strength centrality 
 rownames(centrality_parameters$node.centrality["Strength"])[order(centrality_parameters$node.centrality[,"Betweenness"],decreasing=TRUE)] #sort betweenness centrality
 rownames(centrality_parameters$node.centrality["Strength"])[order(centrality_parameters$node.centrality[,"Closeness"],decreasing=TRUE)] #sort closeness centrality 
+
 #Edge weight accuracy 
 
 fibro_bootnet<-bootnet(network_fibro,type="nonparametric") #edge CIs
