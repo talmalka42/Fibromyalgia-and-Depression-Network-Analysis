@@ -1,1 +1,248 @@
+#Import libraries for analysis and import SPSS files into R
 
+library(EGAnet) #EGA network loadings
+library(bootnet) #edge weight accuracy, case dropping bootstrap, bridge centrality stability, estimate network
+library(qgraph) #calculate centrality indices
+library(igraph) #community detection, spinglass algorithm
+library(networktools) #calculate bridge centrality, network analysis assumption check
+library(haven) #read SPSS file in R
+library(ggplot2)
+library(dplyr)
+library(labelled)
+library(graphics)
+library(labelled)
+library(e1071)
+
+setwd("/Users/TalMalka/Library/CloudStorage/OneDrive-Personal/Grad School/CSV Files") #set working directory
+fibro_dataset1<-read_sav("Fibro 2020 for final dissertation with mean series imputations.sav")
+fibro_dataset2<-read_sav("data for Tal.sav")
+fibro_dataset3<-read_sav("Data after running basic syntax [45 subjects] (04.05.23).sav")
+fibro_dataset4<-read_sav("renen&lee (8).sav")
+
+ 
+#Create subset 1 (select PHQ9, FIQR variables from datasets 1&2)
+
+fibro_dataset_subset1<-fibro_dataset1%>%dplyr::select(1,88:96,68:77)
+fibro_dataset_subset2<-fibro_dataset2%>%dplyr::select(1:10,22:31)
+fibro_dataset_subset_merged<-bind_rows(fibro_dataset_subset1,fibro_dataset_subset2) #merge subsets
+fibro_dataset_subset_merged<-as.data.frame(fibro_dataset_subset_merged) #change dataset from tbl to dataframe
+
+#Create subset 2 (subset 1 + subset3); n = 219
+
+fibro_dataset_subset3<-fibro_dataset3%>%dplyr::select(1,350:358,340:349)%>%rename("Subject"="Number") #change column name in subset3
+fibro_dataset_subset3<-as.data.frame(fibro_dataset_subset3) #change dataset from tbl to dataframe
+fibro_dataset_subset_merged2<-bind_rows(fibro_dataset_subset_merged,fibro_dataset_subset3) #merge subsets
+fibro_dataset_subset_merged2<-as.data.frame(fibro_dataset_subset_merged2)%>%remove_labels() #change dataset from tbl to dataframe, remove labels
+
+#Remove FIQR16 and PHQ9 from merged dataset2 (considerations for removal of variables explained in paper)
+
+fibro_dataset_subset_merged2_edited<-fibro_dataset_subset_merged2%>%dplyr::select(1:9,11:14,16:20)%>%remove_labels()%>%rename_with(~ gsub("FIBRO", "FIQR",.x,fixed = TRUE)) #remove labels; replace "FIBRO" with "FIQR"
+
+ 
+#NAs: replace with mode
+for(i in 1:17){
+  fibro_dataset_subset_merged2_edited[,i+1][is.na(fibro_dataset_subset_merged2_edited[,i+1])]<-as.numeric(names(sort(-table(fibro_dataset_subset_merged2_edited[,i+1]),na.rm=T))[1])
+}
+
+#Network analysis assumption check
+##For loop to check normality of data
+for(i in 1:17){
+qqnorm(fibro_dataset_subset_merged2_edited[,i+1],main=colnames(fibro_dataset_subset_merged2_edited[i+1]))
+qqline(fibro_dataset_subset_merged2_edited[,i+1])
+}
+
+##Network analysis assumptions check
+assumptionCheck(fibro_dataset_subset_merged2_edited[,2:18],type="network",na.rm=T,plot=T)
+
+##Calculate skewness, kurtosis of variables
+normality_df<-data.frame(matrix(ncol=2,nrow=0))
+colnames(normality_df)<-c("Skewness","Kurtosis")
+for(i in 1:17){
+normality_df[i,1]<-skewness(fibro_dataset_subset_merged2_edited[,i+1],na.rm=T,type=2)
+normality_df[i,2]<-kurtosis(fibro_dataset_subset_merged2_edited[,i+1],na.rm=T,type=2)
+}
+rownames(normality_df)<-colnames(fibro_dataset_subset_merged2_edited[2:18])
+normality_df #dataframe with skewness and kurtosis rates for each variable
+
+ 
+##Node redundancy (results: FIQR 14&12, PHQ 2&1, PHQ 8&7, PHQ 3&5)
+goldbricker(fibro_dataset_subset_merged2_edited[,2:18],method="hittner2003")
+
+#Network analysis (with redundant nodes, explained in paper)
+
+network_fibro<-estimateNetwork(fibro_dataset_subset_merged2_edited[,2:18],default="EBICglasso",corMethod="spearman") #estimate Gaussian Graphical Model in bootnet with Spearman correlations
+network_fibro_plot<-plot(network_fibro,title="Fibromyalgia and Depression") #qgraph object, plot network
+print(network_fibro) #which estimation tools to cite from bootnet
+network_fibro_plot$Edgelist$weight #calculate edge weights
+sort(network_fibro_plot$Edgelist$weight)
+
+#Centrality indices (strength, betweenness, closeness)
+
+centrality_parameters<-centrality_auto(network_fibro_plot,weighted=T)
+pdf("~/Desktop/centrality plot.pdf",width=10,height=10)
+centralityPlot(network_fibro_plot,weighted=T,include=c("Strength","Betweenness","Closeness"),scale="raw0") 
+dev.off()
+rownames(centrality_parameters$node.centrality["Strength"])[order(centrality_parameters$node.centrality[,"Strength"],decreasing=TRUE)] #sort strength centrality 
+rownames(centrality_parameters$node.centrality["Strength"])[order(centrality_parameters$node.centrality[,"Betweenness"],decreasing=TRUE)] #sort betweenness centrality
+rownames(centrality_parameters$node.centrality["Strength"])[order(centrality_parameters$node.centrality[,"Closeness"],decreasing=TRUE)] #sort closeness centrality
+
+#Edge weight accuracy 
+
+###fibro_bootnet<-bootnet(network_fibro,type="nonparametric") #edges CIs
+###save(fibro_bootnet,file="fibro_bootnet")
+load(file="fibro_bootnet")
+pdf("~/Desktop/Edge bootstrapped.pdf",width=10,height=20)
+plot(fibro_bootnet,labels=T,order="sample") #"reveals sizable bootstrapped CIs around the estimated edge-weights, indicating that many edge-weights likely do not significantly differ from one-another"
+dev.off()
+
+#Case drop bootstrap (bootnet; strength of centrality indices. Checks for stability of indices by comparing sample indices with those of a subset of the sample. Can be summarized in the correlation stability coefficient CS(cor=0.7) which contains maximum proportion of cases that can be dropped to obtain a 0.7 or higher correlation between original centrality indices and those of subset netowrks 95% of the time. CS should be no less than 0.25 and over 0.5 if possible) 
+
+###fibro_bootnet_casedrop<-bootnet(network_fibro,nBoots=2000,type="case",ncores=8,statistics = c("Strength","Betweenness","Closeness")) #stability centrality
+###save(fibro_bootnet_casedrop,file="fibro_bootnet_casedrop")
+load(file="fibro_bootnet_casedrop")
+pdf("~/Desktop/case_drop.pdf",width=10,height=10)
+plot(fibro_bootnet_casedrop,"all") #plot stability of centrality
+dev.off()
+corStability(fibro_bootnet_casedrop) #CS coefficient 
+
+##Community Detection – spinglass in iqraph; creates qgraph object
+set.seed(100) #note solutions will look different with different seed
+igraph_network<-as.igraph(network_fibro_plot,attributes=TRUE)
+network_fibro_spinglass<-spinglass.community(igraph_network)
+network_fibro_spinglass$membership #detecting communities 
+
+ngroup<-max(network_fibro_spinglass$membership)
+group.spinglass<-list()
+for (x in 1:ngroup){
+  nodes_vector<-which(network_fibro_spinglass$membership==x)
+  group.spinglass[x]<-list(nodes_vector,length=1)
+}
+
+group.spinglass_labels<-c("Psychological factors and psychomotor disturbances"=group.spinglass[3],"Energy, sleep, appetite"=group.spinglass[4],"Pain and stiffness"=group.spinglass[2],"Cognitive factors and sensitization"=group.spinglass[1])
+
+pdf("~/Desktop/Spinglass Clusters.pdf",width=20,height=10)
+qgraph(network_fibro_plot,groups=group.spinglass_labels, legend.cex=.6, vsize=5, title = "", border.width=1.5, border.color="black", cut = 0)
+legend("bottomright",legend=c("PHQ_1: Little interest or pleasure in doing things","PHQ_2: Feeling down, depressed or hopeless","PHQ_3: Trouble sleeping","PHQ_4: Feeling tired","PHQ_5: Appetite", "PHQ_6: Feeling bad about yourself","PHQ_7: Trouble concentrating","PHQ_8: Psychomotor disturbances","FIQR_12: Level of pain","FIQR_13: Level of energy","FIQR_14: Level of stiffness","FIQR_15: Quality of sleep","FIQR_17: Memory problems","FIQR_18: Level of anxiety","FIQR_19: Level of tenderness to touch","FIQR_20: Balance problems","FIQR_21: Sensitivity to external stimuli"))
+dev.off()
+
+#Check community analysis stability:
+##Set negative edges to abs value for Louvain algorithm
+
+abs_edges_network_fibro<-network_fibro
+
+for (i in 1:length(abs_edges_network_fibro$graph)) {
+  abs_edges_network_fibro$graph[i]<-abs(abs_edges_network_fibro$graph[i])
+}
+
+abs_edges_network_fibro_plot<-plot(abs_edges_network_fibro)
+igraph_abs_edges_network_fibro<-as.igraph(abs_edges_network_fibro_plot,attributes=TRUE)
+
+##Louvain
+
+network_fibro_louvain<-cluster_louvain(igraph_abs_edges_network_fibro)
+
+#Plot communities by color, Louvain
+
+ngroup<-max(network_fibro_louvain$membership)
+group.louvain<-list()
+for (x in 1:ngroup){
+  nodes_vector<-which(network_fibro_louvain$membership==x)
+  group.louvain[x]<-list(nodes_vector,length=1)
+}
+
+pdf("~/Desktop/Louvain Clusters.pdf",width=18,height=10)
+qgraph(network_fibro_plot,aspect=TRUE,rescale=TRUE,groups=group.louvain, legend.cex=.6, vsize=6.3, title = "Louvain Clusters", border.width=1.5, border.color="black", cut = 0)
+legend("bottomright",legend=c("PHQ_1: Little interest or pleasure in doing things","PHQ_2: Feeling down, depressed or hopeless","PHQ_3: Trouble sleeping","PHQ_4: Feeling tired","PHQ_5: Appetite", "PHQ_6: Feeling bad about yourself","PHQ_7: Trouble concentrating","PHQ_8: Psychomotor disturbances","FIQR_12: Level of pain","FIQR_13: Level of energy","FIQR_14: Level of stiffness","FIQR_15: Quality of sleep","FIQR_17: Memory problems","FIQR_18: Level of anxiety","FIQR_19: Level of tenderness to touch","FIQR_20: Balance problems","FIQR_21: Sensitivity to external stimuli"))
+dev.off()
+
+
+pdf("~/Desktop/Comorbidity.pdf",width=18,height=10)
+group.comorbidity<-c(rep("Depression",8),rep("Fibromyalgia",9))
+qgraph(network_fibro_plot,groups=group.comorbidity, legend.cex=.6, vsize=6.3, title = "", border.width=1.5, border.color="black", cut = 0)
+legend("bottomright",legend=c("PHQ_1: Little interest or pleasure in doing things","PHQ_2: Feeling down, depressed or hopeless","PHQ_3: Trouble sleeping","PHQ_4: Feeling tired","PHQ_5: Appetite", "PHQ_6: Feeling bad about yourself","PHQ_7: Trouble concentrating","PHQ_8: Psychomotor disturbances","FIQR_12: Level of pain","FIQR_13: Level of energy","FIQR_14: Level of stiffness","FIQR_15: Quality of sleep","FIQR_17: Memory problems","FIQR_18: Level of anxiety","FIQR_19: Level of tenderness to touch","FIQR_20: Balance problems","FIQR_21: Sensitivity to external stimuli"))
+dev.off()
+
+#EGA network loadings
+
+##To create the partial correlation matrix 
+pcorMat <- getWmat(network_fibro) 
+TableMat <- as.data.frame(pcorMat) 
+TableMat
+
+net.loads(
+  TableMat,
+  network_fibro_spinglass$membership
+)
+
+##Create an edge weights table 
+DataFrame<-as.data.frame(network_fibro_plot$Edgelist) 
+view(DataFrame)
+
+#Bridge centrality
+
+library(networktools)
+#function bridge
+
+bridge_centrality<-bridge(network_fibro_plot,communities=group.comorbidity)
+pdf("~/Desktop/bridge centrality plot.pdf",width=10,height=10)
+plot(
+  bridge_centrality,
+  order = c("given", "alphabetical", "value"),
+  zscore = FALSE,
+  color = FALSE,
+  colpalette = "Dark2",
+  plotNA = FALSE,
+  include = c("Bridge Strength", "Bridge Betweenness")
+)
+dev.off()
+
+sort(bridge_centrality$`Bridge Strength`) #Bridge Strength
+
+##Bridge centrality stability
+
+###bridge_bootstrap <- bootnet(network_fibro,boots=2000,type="nonparametric", statistics="all", communities=group.comorbidity)
+###save(bridge_bootstrap,file="bridge_bootstrap")
+load(file="bridge_bootstrap")
+
+###bridge_casedrop <- bootnet(network_fibro,boots=2000,type="case", statistics="all", communities=group.comorbidity)
+###save(bridge_bootstrap,file="bridge_casedrop")
+load(file="bridge_casedrop")
+
+corStability(bridge_casedrop)
+
+pdf("~/Desktop/bridge casedrop.pdf",width=10,height=10)
+plot(bridge_casedrop,statistics="bridgeStrength")
+dev.off()
+pdf("~/Desktop/bridge bootstrap.pdf",width=10,height=18)
+plot(bridge_bootstrap, statistics="bridgeStrength")
+dev.off()
+
+
+###Test multiple imputation to compare single imputation with mode for NA replacement for merged dataset###
+
+library(mice) #library for replacing missing data with multiple imputation
+fibro_dataset_subset_merged2_edited.imp <- mice(fibro_dataset_subset_merged2_edited,m=10,method="pmm",print=F) #creating separate imputated datasets
+
+#for loop to conduct network analysis separately on each imputated dataset and compare cluster and network structure
+
+for(i in 1:10){
+  print(i)
+  #create network
+  imp_dataset<-complete(fibro_dataset_subset_merged2_edited.imp,i)
+  imp_network<-estimateNetwork(imp_dataset[,2:18],default="EBICglasso",corMethod="spearman")
+  imp_network_plot<-plot(imp_network,title=i,print=FALSE)
+  print(sort(imp_network_plot$Edgelist$weight))
+  #Community Detection
+  library(igraph)
+  set.seed(100) #run algorithm 1000 times -> find seed which reproduces this median number of clusters -> note solutions will look different with different seed
+  igraph_imp_network<-as.igraph(imp_network_plot,attributes=TRUE)
+  imp_network_spinglass<-spinglass.community(igraph_imp_network)
+  print(imp_network_spinglass$membership) #detecting communities
+  ngroup<-max(imp_network_spinglass$membership)
+  imp_group.spinglass<-list()
+  for (x in 1:ngroup){
+    nodes_vector<-which(imp_network_spinglass$membership==x)
+    imp_group.spinglass[x]<-list(nodes_vector,length=1)
+  }
+  qgraph(imp_network_plot, groups=imp_group.spinglass, legend.cex=.6, vsize=6.3, title = i, border.width=1.5, border.color="black", cut = 0)
+}
