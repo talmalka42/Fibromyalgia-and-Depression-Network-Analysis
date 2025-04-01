@@ -218,7 +218,7 @@ plot(bridge_bootstrap, statistics="bridgeStrength")
 dev.off()
 
 
-###Test multiple imputation to compare single imputation with mode for NA replacement for merged dataset###
+###Test multiple imputation to compare single imputation (with mode) for NA replacement in merged dataset###
 
 library(mice) #library for replacing missing data with multiple imputation
 fibro_dataset_subset_merged2_edited.imp <- mice(fibro_dataset_subset_merged2_edited,m=10,method="pmm",print=F) #creating separate imputated datasets
@@ -226,7 +226,6 @@ fibro_dataset_subset_merged2_edited.imp <- mice(fibro_dataset_subset_merged2_edi
 #for loop to conduct network analysis separately on each imputated dataset and compare cluster and network structure
 
 for(i in 1:10){
-  print(i)
   #create network
   imp_dataset<-complete(fibro_dataset_subset_merged2_edited.imp,i)
   imp_network<-estimateNetwork(imp_dataset[,2:18],default="EBICglasso",corMethod="spearman")
