@@ -3,6 +3,5 @@ Code for how to conduct network analysis in R. Supplementary material for paper 
 Tal Malka, Hadar Marom-Harel, Lee Frumer, Nancy Agmon-Levin, Renen Taub, Ittai Glick,
 Roee Admon, Shir Hanuka, Naama Peretz-Tamari, Adam Brown, & Danny Horesh
 
-Contact: Tal Malka
-Department of Psychology, The New School, New York
+Contact: Tal Malka, M.A
 talmalka42@gmail.com
