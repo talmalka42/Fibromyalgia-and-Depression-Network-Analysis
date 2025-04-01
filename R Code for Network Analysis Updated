@@ -135,7 +135,7 @@ for (i in 1:length(abs_edges_network_fibro$graph)) {
 }
 
 abs_edges_network_fibro_plot<-plot(abs_edges_network_fibro)
-igraph_abs_edges_network_fibro<-as.igraph(abs_edges_network_fibro_plot,attributes=TRUE)
+igraph_abs_edges_network_fibro<-as.igraph(abs_edges_network_fibro_plot,attributes=TRUE) #create igraph object for Louvain algorithm
 
 ##Louvain
 
@@ -223,7 +223,7 @@ dev.off()
 library(mice) #library for replacing missing data with multiple imputation
 fibro_dataset_subset_merged2_edited.imp <- mice(fibro_dataset_subset_merged2_edited,m=10,method="pmm",print=F) #creating separate imputated datasets
 
-#for loop to conduct network analysis separately on each imputated dataset and compare cluster and network structure
+#for loop to conduct network analysis separately on each imputated dataset to compare cluster and network structure
 
 for(i in 1:10){
   #create network
