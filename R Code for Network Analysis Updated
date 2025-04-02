@@ -73,8 +73,11 @@ goldbricker(fibro_dataset_subset_merged2_edited[,2:18],method="hittner2003")
 network_fibro<-estimateNetwork(fibro_dataset_subset_merged2_edited[,2:18],default="EBICglasso",corMethod="spearman") #estimate Gaussian Graphical Model in bootnet with Spearman correlations
 network_fibro_plot<-plot(network_fibro,title="Fibromyalgia and Depression") #qgraph object, plot network
 print(network_fibro) #which estimation tools to cite from bootnet
-network_fibro_plot$Edgelist$weight #calculate edge weights
-sort(network_fibro_plot$Edgelist$weight)
+
+#Create an edge weights table
+
+DataFrame<-as.data.frame(network_fibro_plot$Edgelist) 
+View(DataFrame)
 
 #Centrality indices (strength, betweenness, closeness)
 
