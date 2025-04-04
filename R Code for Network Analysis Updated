@@ -68,7 +68,11 @@ normality_df #dataframe with skewness and kurtosis rates for each variable
 ##Node redundancy (results: FIQR 14&12, PHQ 2&1, PHQ 8&7, PHQ 3&5)
 goldbricker(fibro_dataset_subset_merged2_edited[,2:18],method="hittner2003")
 
-#Network analysis (with redundant nodes, explained in paper)
+###Removal of PHQ 1, PHQ 3, PHQ 8, FIQR 14 from dataset based on goldbricker and theory
+
+fibro_dataset_subset_merged2_edited<-fibro_dataset_subset_merged2_edited%>%dplyr::select(1,3,5:8,10:11,13:18)
+
+#Network analysis (without redundant nodes, explained in paper)
 
 network_fibro<-estimateNetwork(fibro_dataset_subset_merged2_edited[,2:18],default="EBICglasso",corMethod="spearman") #estimate Gaussian Graphical Model in bootnet with Spearman correlations
 network_fibro_plot<-plot(network_fibro,title="Fibromyalgia and Depression") #qgraph object, plot network
